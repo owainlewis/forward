@@ -1,0 +1,17 @@
+# Proxy configuration
+proxy:
+    port: 3000
+namespace: v1
+# Global request policies
+  policies:
+    - request:
+      - check-header:
+        name: Authorization
+        error_code: 401
+        error_message: 'Missing Authorization HTTP Header'
+# Route dispatch        
+  routes:  
+    path: /foo
+    backend: 
+      type: http
+      endpoint: https://httpbin.org

@@ -65,7 +65,6 @@ impl ReverseProxy {
         *updated.uri_mut() = builder.build()?;
 
         log::info!("request == {:?}", updated);
-
         let response = self.client.request(updated).await?;
         log::debug!("response == {:?}", response);
         Ok(response)
