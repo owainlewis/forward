@@ -1,9 +1,34 @@
 use hyper::service::{make_service_fn, service_fn};
-use hyper::{Client, Server};
+use hyper::{Client, Server, Request, Response, Body, StatusCode, Uri};
 use hyper_tls::HttpsConnector;
 use std::net::SocketAddr;
 
-mod proxy;
+type HttpClient    = Client<HttpsConnector<hyper::client::HttpConnector>>;
+type ProxyResponse = Result<Response<Body>, hyper::Error>;
+
+// Proxy a request to a backend server
+async fn proxy_request(mut req: Request<Body>, client: HttpClient) -> ProxyResponse {
+    // Modify request here 
+    let uri = "https://github.com/".parse::<Uri>().unwrap();
+    *req.uri_mut() = uri;
+
+    // Dispatch
+    let response = match client.request(req).await {
+        Ok(res) => res,
+        Err(e) => {
+            return Ok(
+                Response::builder().
+                status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body(format!("Could not complete request: \"{}\"", e).into())
+                .unwrap()
+            )
+        }
+    };
+
+    // Modify repsonse here
+
+    Ok(response)    
+}
 
 #[tokio::main]
 async fn main() {
@@ -15,17 +40,13 @@ async fn main() {
     let https = HttpsConnector::new();
     let client = Client::builder().build(https);
 
-    let proxy_config = std::sync::Arc::new(proxy::ReverseProxy {
-        client
-    });
+    let make_svc = make_service_fn(move |_| {
+        let client = client.clone();
 
-    let make_svc = make_service_fn(move |_conn| {
-        let rp = proxy_config.clone();
         async {
-            Ok::<_, proxy::ReverseProxyError>(service_fn(move |req| {
-                let rp = rp.clone();
-                async move { rp.handle(req).await }
-            }))
+            Ok::<_, hyper::Error>(service_fn(move |req| {
+                proxy_request(req, client.to_owned())
+             }))
         }
     });
 
