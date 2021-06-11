@@ -1,34 +1,10 @@
 use hyper::service::{make_service_fn, service_fn};
-use hyper::{Client, Server, Request, Response, Body, StatusCode, Uri};
+
+use hyper::{Client, Server};
 use hyper_tls::HttpsConnector;
 use std::net::SocketAddr;
 
-type HttpClient    = Client<HttpsConnector<hyper::client::HttpConnector>>;
-type ProxyResponse = Result<Response<Body>, hyper::Error>;
-
-// Proxy a request to a backend server
-async fn proxy_request(mut req: Request<Body>, client: HttpClient) -> ProxyResponse {
-    // Modify request here 
-    let uri = "https://github.com/".parse::<Uri>().unwrap();
-    *req.uri_mut() = uri;
-
-    // Dispatch
-    let response = match client.request(req).await {
-        Ok(res) => res,
-        Err(e) => {
-            return Ok(
-                Response::builder().
-                status(StatusCode::INTERNAL_SERVER_ERROR)
-                .body(format!("Could not complete request: \"{}\"", e).into())
-                .unwrap()
-            )
-        }
-    };
-
-    // Modify repsonse here
-
-    Ok(response)    
-}
+mod proxy;
 
 #[tokio::main]
 async fn main() {
@@ -45,7 +21,7 @@ async fn main() {
 
         async {
             Ok::<_, hyper::Error>(service_fn(move |req| {
-                proxy_request(req, client.to_owned())
+                proxy::dispatch(req, client.to_owned())
              }))
         }
     });
